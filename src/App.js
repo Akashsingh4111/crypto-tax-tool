@@ -3,11 +3,11 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import SignUp from './pages/SignUp';
 import Login from './pages/Login';
 import './App.css';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // ==================== FIRESTORE FUNCTIONS ====================
 
@@ -90,7 +90,6 @@ function calculateIndianTax(transactions, totalInvested, currentValue, prices) {
   let longTermGain = 0;
   let shortTermTax = 0;
   let longTermTax = 0;
-  const today = new Date();
 
   const buyTransactions = transactions.filter(t => t.type === 'buy');
   const sellTransactions = transactions.filter(t => t.type === 'sell');
