@@ -1,11 +1,88 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
+import { db } from './firebase';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import SignUp from './pages/SignUp';
 import Login from './pages/Login';
 import './App.css';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
+// ==================== FIRESTORE FUNCTIONS ====================
+
+// SAVE TRANSACTION TO FIRESTORE
+async function saveTransactionToFirestore(transaction, userId) {
+  try {
+    const docRef = await addDoc(collection(db, 'transactions'), {
+      coin: transaction.coin,
+      symbol: transaction.symbol,
+      quantity: transaction.quantity,
+      pricePerCoin: transaction.pricePerCoin,
+      totalInvested: transaction.totalInvested,
+      date: transaction.date,
+      type: transaction.type,
+      userId: userId,
+      createdAt: new Date().toISOString()
+    });
+    console.log('✅ Saved to Firestore:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Error saving:', error);
+    throw error;
+  }
+}
+
+// LOAD TRANSACTIONS FROM FIRESTORE
+async function loadTransactionsFromFirestore(userId) {
+  try {
+    const q = query(collection(db, 'transactions'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    const transactions = [];
+    querySnapshot.forEach((docSnap) => {
+      transactions.push({
+        id: docSnap.id,
+        ...docSnap.data()
+      });
+    });
+    console.log('✅ Loaded from Firestore:', transactions.length, 'transactions');
+    return transactions;
+  } catch (error) {
+    console.error('❌ Error loading:', error);
+    return [];
+  }
+}
+
+// DELETE TRANSACTION FROM FIRESTORE
+async function deleteTransactionFromFirestore(docId) {
+  try {
+    await deleteDoc(doc(db, 'transactions', docId));
+    console.log('✅ Deleted from Firestore:', docId);
+  } catch (error) {
+    console.error('❌ Error deleting:', error);
+    throw error;
+  }
+}
+
+// UPDATE TRANSACTION IN FIRESTORE
+async function updateTransactionInFirestore(docId, updatedData) {
+  try {
+    const docRef = doc(db, 'transactions', docId);
+    await updateDoc(docRef, {
+      coin: updatedData.coin,
+      symbol: updatedData.symbol,
+      quantity: updatedData.quantity,
+      pricePerCoin: updatedData.pricePerCoin,
+      totalInvested: updatedData.totalInvested,
+      date: updatedData.date,
+      type: updatedData.type
+    });
+    console.log('✅ Updated in Firestore:', docId);
+  } catch (error) {
+    console.error('❌ Error updating:', error);
+    throw error;
+  }
+}
 
 // ==================== IMPROVED TAX CALCULATOR ====================
 function calculateIndianTax(transactions, totalInvested, currentValue, prices) {
@@ -233,6 +310,7 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   if (!user) {
     return (
@@ -250,26 +328,32 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleAddTransaction = (e) => {
+  const handleAddTransaction = async (e) => {
     e.preventDefault();
     if (!formData.coin || !formData.quantity || !formData.pricePerCoin) {
       setToast({ message: 'Please fill all required fields', type: 'error' });
       return;
     }
 
+    setLoading(true);
+
     if (editingId) {
-      setTransactions(transactions.map(t => t.id === editingId ? {
-        ...formData,
-        id: editingId,
-        quantity: parseFloat(formData.quantity),
-        pricePerCoin: parseFloat(formData.pricePerCoin),
-        totalInvested: parseFloat(formData.quantity) * parseFloat(formData.pricePerCoin),
-      } : t));
-      setEditingId(null);
-      setToast({ message: 'Transaction updated!', type: 'success' });
+      try {
+        await updateTransactionInFirestore(editingId, formData);
+        setTransactions(transactions.map(t => t.id === editingId ? {
+          ...formData,
+          id: editingId,
+          quantity: parseFloat(formData.quantity),
+          pricePerCoin: parseFloat(formData.pricePerCoin),
+          totalInvested: parseFloat(formData.quantity) * parseFloat(formData.pricePerCoin),
+        } : t));
+        setEditingId(null);
+        setToast({ message: '✅ Updated in cloud!', type: 'success' });
+      } catch (error) {
+        setToast({ message: '❌ Failed to update: ' + error.message, type: 'error' });
+      }
     } else {
       const newTransaction = {
-        id: Date.now(),
         coin: formData.coin,
         symbol: formData.symbol.toUpperCase(),
         quantity: parseFloat(formData.quantity),
@@ -278,18 +362,31 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
         date: formData.date || new Date().toISOString().split('T')[0],
         type: formData.type
       };
-      setTransactions([...transactions, newTransaction]);
-      setToast({ message: 'Transaction added!', type: 'success' });
+
+      try {
+        const firestoreId = await saveTransactionToFirestore(newTransaction, user.uid);
+        newTransaction.id = firestoreId;
+        setTransactions([...transactions, newTransaction]);
+        setToast({ message: '✅ Saved to cloud!', type: 'success' });
+      } catch (error) {
+        setToast({ message: '❌ Failed to save: ' + error.message, type: 'error' });
+      }
     }
-    
+
     setFormData({ coin: '', symbol: '', quantity: '', pricePerCoin: '', date: '', type: 'buy' });
     setShowForm(false);
+    setLoading(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Delete this transaction?')) {
-      setTransactions(transactions.filter(t => t.id !== id));
-      setToast({ message: 'Transaction deleted!', type: 'success' });
+      try {
+        await deleteTransactionFromFirestore(id);
+        setTransactions(transactions.filter(t => t.id !== id));
+        setToast({ message: '✅ Deleted from cloud!', type: 'success' });
+      } catch (error) {
+        setToast({ message: '❌ Failed to delete: ' + error.message, type: 'error' });
+      }
     }
   };
 
@@ -322,7 +419,7 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
       <h1 className="animate-fade-in">📋 Transactions</h1>
       
       <div className="actions-bar animate-slide-down">
-        <button className="btn-primary" onClick={() => { setShowForm(!showForm); setEditingId(null); }}>
+        <button className="btn-primary" onClick={() => { setShowForm(!showForm); setEditingId(null); }} disabled={loading}>
           {showForm ? '✕ Close' : '+ Add Transaction'}
         </button>
         <input type="text" placeholder="🔍 Search coins..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="search-input" />
@@ -331,7 +428,7 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
           <option value="buy">🟢 Buys Only</option>
           <option value="sell">🔴 Sells Only</option>
         </select>
-        {transactions.length > 0 && <button className="btn-success" onClick={handleDownloadCSV}>📥 CSV</button>}
+        {transactions.length > 0 && <button className="btn-success" onClick={handleDownloadCSV} disabled={loading}>📥 CSV</button>}
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -341,38 +438,38 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
           <h2>{editingId ? '✏️ Edit Transaction' : '➕ Add Transaction'}</h2>
           <div className="form-group">
             <label>Coin Name *</label>
-            <input type="text" name="coin" placeholder="e.g., Bitcoin" value={formData.coin} onChange={handleInputChange} required />
+            <input type="text" name="coin" placeholder="e.g., Bitcoin" value={formData.coin} onChange={handleInputChange} required disabled={loading} />
           </div>
           <div className="form-group">
             <label>Symbol *</label>
-            <input type="text" name="symbol" placeholder="e.g., BTC" value={formData.symbol} onChange={handleInputChange} required />
+            <input type="text" name="symbol" placeholder="e.g., BTC" value={formData.symbol} onChange={handleInputChange} required disabled={loading} />
           </div>
           <div className="form-row">
             <div className="form-group">
               <label>Quantity *</label>
-              <input type="number" name="quantity" placeholder="e.g., 0.5" step="0.0001" value={formData.quantity} onChange={handleInputChange} required />
+              <input type="number" name="quantity" placeholder="e.g., 0.5" step="0.0001" value={formData.quantity} onChange={handleInputChange} required disabled={loading} />
             </div>
             <div className="form-group">
               <label>Price Per Coin (₹) *</label>
-              <input type="number" name="pricePerCoin" placeholder="e.g., 50000" step="0.01" value={formData.pricePerCoin} onChange={handleInputChange} required />
+              <input type="number" name="pricePerCoin" placeholder="e.g., 50000" step="0.01" value={formData.pricePerCoin} onChange={handleInputChange} required disabled={loading} />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
               <label>Date</label>
-              <input type="date" name="date" value={formData.date} onChange={handleInputChange} />
+              <input type="date" name="date" value={formData.date} onChange={handleInputChange} disabled={loading} />
             </div>
             <div className="form-group">
               <label>Type</label>
-              <select name="type" value={formData.type} onChange={handleInputChange}>
+              <select name="type" value={formData.type} onChange={handleInputChange} disabled={loading}>
                 <option value="buy">🟢 Buy</option>
                 <option value="sell">🔴 Sell</option>
               </select>
             </div>
           </div>
           <div className="form-actions">
-            <button type="submit" className="btn-success">{editingId ? '✏️ Update' : '➕ Add'}</button>
-            <button type="button" className="btn-cancel" onClick={() => { setShowForm(false); setEditingId(null); }}>Cancel</button>
+            <button type="submit" className="btn-success" disabled={loading}>{editingId ? (loading ? '⏳ Updating...' : '✏️ Update') : (loading ? '⏳ Adding...' : '➕ Add')}</button>
+            <button type="button" className="btn-cancel" onClick={() => { setShowForm(false); setEditingId(null); }} disabled={loading}>Cancel</button>
           </div>
         </form>
       )}
@@ -393,14 +490,14 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
             {filteredTransactions.map((tx) => (
               <div key={tx.id} className="table-row">
                 <div className="col-coin"><strong>{tx.symbol}</strong><span>{tx.coin}</span></div>
-                <div className="col-qty">{tx.quantity}</div>
+                <div className="col-qty">{tx.quantity.toFixed(4)}</div>
                 <div className="col-price">₹{tx.pricePerCoin.toFixed(2)}</div>
                 <div className="col-total">₹{tx.totalInvested.toFixed(2)}</div>
                 <div className="col-date">{tx.date}</div>
                 <div className={`col-type type-${tx.type}`}>{tx.type}</div>
                 <div className="col-actions">
-                  <button className="btn-edit" onClick={() => handleEdit(tx)}>✏️</button>
-                  <button className="btn-delete" onClick={() => handleDelete(tx.id)}>🗑️</button>
+                  <button className="btn-edit" onClick={() => handleEdit(tx)} disabled={loading}>✏️</button>
+                  <button className="btn-delete" onClick={() => handleDelete(tx.id)} disabled={loading}>🗑️</button>
                 </div>
               </div>
             ))}
@@ -631,42 +728,6 @@ function TaxReports({ transactions, totalInvested, coinData, prices, darkMode, t
             </table>
           </div>
 
-          ${taxInfo.totalRealizedGain > 0 && taxInfo.totalRealizedGain < 250000 ? `
-          <div class="warning">
-            <strong>⚠️ Important Note:</strong> Your realized gain is below ₹2,50,000. While no TDS is deducted automatically, you <strong>MUST still report it in your income tax return</strong>. Failure to report can attract penalties.
-          </div>
-          ` : ''}
-
-          <div class="section">
-            <h2>📈 Transaction Summary</h2>
-            <table>
-              <tr>
-                <th>Metric</th>
-                <th>Value</th>
-              </tr>
-              <tr>
-                <td>Total Buy Transactions</td>
-                <td>${transactions.filter(t => t.type === 'buy').length}</td>
-              </tr>
-              <tr>
-                <td>Total Sell Transactions</td>
-                <td>${transactions.filter(t => t.type === 'sell').length}</td>
-              </tr>
-              <tr>
-                <td>Unique Coins Traded</td>
-                <td>${Object.keys(coinData).length}</td>
-              </tr>
-              <tr>
-                <td>Total Loss (Carry Forward)</td>
-                <td>₹${taxInfo.totalLoss.toFixed(2)}</td>
-              </tr>
-              <tr>
-                <td>After-Tax Profit</td>
-                <td class="positive">₹${afterTaxProfit.toFixed(2)}</td>
-              </tr>
-            </table>
-          </div>
-
           <div class="section">
             <h2>📋 Detailed Transactions</h2>
             <table>
@@ -689,30 +750,6 @@ function TaxReports({ transactions, totalInvested, coinData, prices, darkMode, t
               </tr>
               `).join('')}
             </table>
-          </div>
-
-          <div class="section">
-            <h2>📌 India Tax Rules & Guidelines</h2>
-            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; line-height: 1.8;">
-              <strong style="display: block; margin-bottom: 10px; color: #667eea;">🔹 Short-term Capital Gain (Holding &lt; 2 years)</strong>
-              Taxed at your income tax slab rate (30% average for traders). This is added to your total income and taxed accordingly.
-              
-              <br><br><strong style="display: block; margin-bottom: 10px; color: #667eea;">🔹 Long-term Capital Gain (Holding ≥ 2 years)</strong>
-              Taxed at 20% flat rate with indexation benefit. This means your cost basis is adjusted for inflation.
-              
-              <br><br><strong style="display: block; margin-bottom: 10px; color: #667eea;">🔹 No TDS if Gain &lt;  ₹2,50,000</strong>
-              If your realized gain is below ₹2,50,000, no TDS is deducted automatically, but you MUST report it in your tax return.
-              
-              <br><br><strong style="display: block; margin-bottom: 10px; color: #667eea;">🔹 Carry Forward Losses</strong>
-              Capital losses can be carried forward for up to 8 years and set off against future capital gains.
-              
-              <br><br><strong style="display: block; margin-bottom: 10px; color: #667eea;">🔹 FIFO Method</strong>
-              This report uses FIFO (First In First Out) method to calculate gains, which is the most common method.
-            </div>
-          </div>
-
-          <div class="warning" style="margin-top: 30px;">
-            <strong>⚠️ Disclaimer:</strong> This report is for informational purposes only. It is not professional tax advice. Please consult with a qualified CA (Chartered Accountant) before filing your tax return. Tax laws are subject to change, and individual circumstances may vary.
           </div>
 
           <div class="footer">
@@ -817,6 +854,17 @@ function App() {
     });
     return unsubscribe;
   }, []);
+
+  // Load transactions from Firestore when user logs in
+  useEffect(() => {
+    if (user) {
+      loadTransactionsFromFirestore(user.uid).then(data => {
+        setTransactions(data);
+      });
+    } else {
+      setTransactions([]);
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to logout?')) {
