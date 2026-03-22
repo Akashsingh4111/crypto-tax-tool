@@ -1,18 +1,27 @@
+* {
+  box-sizing: border-box;
+}
+
 .App {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
 }
 
 .App-header {
   text-align: center;
   padding: 2rem;
   background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .App-header h1 {
   margin: 0;
   font-size: 2.5rem;
+  font-weight: 700;
 }
 
 .App-header p {
@@ -22,11 +31,12 @@
 }
 
 .container {
-  max-width: 1000px;
-  margin: 2rem auto;
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 2rem;
 }
 
+/* Stats Section */
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -40,6 +50,13 @@
   border-radius: 12px;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
 .stat-card h3 {
@@ -48,6 +65,7 @@
   opacity: 0.8;
   text-transform: uppercase;
   letter-spacing: 1px;
+  font-weight: 600;
 }
 
 .stat-card p {
@@ -56,6 +74,7 @@
   font-weight: bold;
 }
 
+/* Buttons */
 .btn-primary {
   background: #fff;
   color: #667eea;
@@ -66,6 +85,7 @@
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
+  margin-bottom: 2rem;
 }
 
 .btn-primary:hover {
@@ -75,4 +95,251 @@
 
 .btn-primary:active {
   transform: translateY(0);
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Form */
+.transaction-form {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.transaction-form h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.form-group input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.form-actions button {
+  flex: 1;
+}
+
+/* Transactions List */
+.transactions-list {
+  margin-top: 2rem;
+}
+
+.transactions-list h2 {
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.transactions-table {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1.2fr 1fr;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  font-weight: bold;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1.2fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  align-items: center;
+  transition: background 0.3s ease;
+}
+
+.table-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.col-coin {
+  display: flex;
+  flex-direction: column;
+}
+
+.col-coin strong {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.col-coin span {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.col-qty,
+.col-price,
+.col-total,
+.col-date {
+  text-align: right;
+  font-size: 0.95rem;
+}
+
+.col-type {
+  text-align: right;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.type-buy {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.type-sell {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  opacity: 0.8;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .App-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .container {
+    padding: 1rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .col-coin::before { content: 'Coin: '; opacity: 0.7; }
+  .col-qty::before { content: 'Qty: '; opacity: 0.7; }
+  .col-price::before { content: 'Price: '; opacity: 0.7; }
+  .col-total::before { content: 'Total: '; opacity: 0.7; }
+  .col-date::before { content: 'Date: '; opacity: 0.7; }
+  .col-type::before { content: 'Type: '; opacity: 0.7; }
+
+  .col-qty,
+  .col-price,
+  .col-total,
+  .col-date,
+  .col-type {
+    text-align: left;
+  }
 }
