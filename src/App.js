@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './firebase';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import SignUp from './pages/SignUp';
+import Login from './pages/Login';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 // ==================== IMPROVED TAX CALCULATOR ====================
-// Accurate for India: Handles short-term vs long-term capital gains
-
 function calculateIndianTax(transactions, totalInvested, currentValue, prices) {
   let shortTermGain = 0;
   let longTermGain = 0;
@@ -96,7 +98,7 @@ function Toast({ message, type = 'success' }) {
 }
 
 // ==================== HOME PAGE ====================
-function Home({ transactions, totalInvested, totalQuantity, historicalData, coinData, darkMode, prices, taxInfo }) {
+function Home({ transactions, totalInvested, totalQuantity, historicalData, coinData, darkMode, prices, taxInfo, user }) {
   const currentValue = Object.values(coinData).reduce((sum, coin) => {
     const price = prices[coin.name] || 0;
     return sum + (coin.quantity * price);
@@ -113,8 +115,6 @@ function Home({ transactions, totalInvested, totalQuantity, historicalData, coin
       currentValue: coin.quantity * (prices[coin.name] || 0),
       gain: (coin.quantity * (prices[coin.name] || 0)) - coin.value
     }));
-
-  const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b', '#fa709a', '#fee140'];
 
   return (
     <div className="page">
@@ -217,7 +217,11 @@ function Home({ transactions, totalInvested, totalQuantity, historicalData, coin
 
       {transactions.length === 0 && (
         <div className="empty-state">
-          <p>No transactions yet. Go to <Link to="/transactions">Transactions</Link> to add one!</p>
+          {user ? (
+            <p>No transactions yet. Go to <Link to="/transactions">Transactions</Link> to add one!</p>
+          ) : (
+            <p>Please <Link to="/login">login</Link> to start tracking your crypto investments!</p>
+          )}
         </div>
       )}
     </div>
@@ -225,10 +229,21 @@ function Home({ transactions, totalInvested, totalQuantity, historicalData, coin
 }
 
 // ==================== TRANSACTIONS PAGE ====================
-function Transactions({ transactions, setTransactions, showForm, setShowForm, formData, setFormData, darkMode, toast, setToast }) {
+function Transactions({ transactions, setTransactions, showForm, setShowForm, formData, setFormData, darkMode, toast, setToast, user }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [editingId, setEditingId] = useState(null);
+
+  if (!user) {
+    return (
+      <div className="page">
+        <h1>📋 Transactions</h1>
+        <div className="empty-state">
+          <p>Please <Link to="/login">login</Link> to view transactions.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -401,7 +416,18 @@ function Transactions({ transactions, setTransactions, showForm, setShowForm, fo
 }
 
 // ==================== ANALYTICS PAGE ====================
-function Analytics({ transactions, totalInvested, coinData, prices, taxInfo }) {
+function Analytics({ transactions, totalInvested, coinData, prices, taxInfo, user }) {
+  if (!user) {
+    return (
+      <div className="page">
+        <h1>📊 Analytics</h1>
+        <div className="empty-state">
+          <p>Please <Link to="/login">login</Link> to view analytics.</p>
+        </div>
+      </div>
+    );
+  }
+
   const currentValue = Object.values(coinData).reduce((sum, coin) => {
     const price = prices[coin.name] || 0;
     return sum + (coin.quantity * price);
@@ -491,7 +517,18 @@ function Analytics({ transactions, totalInvested, coinData, prices, taxInfo }) {
 }
 
 // ==================== TAX REPORTS PAGE ====================
-function TaxReports({ transactions, totalInvested, coinData, prices, darkMode, taxInfo }) {
+function TaxReports({ transactions, totalInvested, coinData, prices, darkMode, taxInfo, user }) {
+  if (!user) {
+    return (
+      <div className="page">
+        <h1>💳 Tax Reports</h1>
+        <div className="empty-state">
+          <p>Please <Link to="/login">login</Link> to view tax reports.</p>
+        </div>
+      </div>
+    );
+  }
+
   const currentValue = Object.values(coinData).reduce((sum, coin) => {
     const price = prices[coin.name] || 0;
     return sum + (coin.quantity * price);
@@ -574,7 +611,7 @@ function TaxReports({ transactions, totalInvested, coinData, prices, darkMode, t
                 <th>Tax Amount</th>
               </tr>
               <tr>
-                <td>🔴 Short-term Capital Gain (< 2 years)</td>
+                <td>🔴 Short-term Capital Gain (&lt; 2 years)</td>
                 <td>₹${taxInfo.shortTermGain.toFixed(2)}</td>
                 <td>30% (Avg Income Tax Slab)</td>
                 <td class="alert">₹${taxInfo.shortTermTax.toFixed(2)}</td>
@@ -763,14 +800,38 @@ function TaxReports({ transactions, totalInvested, coinData, prices, darkMode, t
 
 // ==================== MAIN APP ====================
 function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
   const [prices, setPrices] = useState({});
   const [toast, setToast] = useState(null);
   const [formData, setFormData] = useState({ coin: '', symbol: '', quantity: '', pricePerCoin: '', date: '', type: 'buy' });
 
-  // Fetch live prices from CoinGecko
+  // Check authentication
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      try {
+        await signOut(auth);
+        setTransactions([]);
+        setFormData({ coin: '', symbol: '', quantity: '', pricePerCoin: '', date: '', type: 'buy' });
+        alert('Logged out!');
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+  };
+
+  // Fetch live prices
   useEffect(() => {
     const fetchPrices = async () => {
       try {
@@ -840,6 +901,24 @@ function App() {
     }
   }, [toast]);
 
+  // Show loading screen
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        fontSize: '20px'
+      }}>
+        ⏳ Loading...
+      </div>
+    );
+  }
+
+  // Main App (always show, with auth in navbar)
   return (
     <Router>
       <div className={`App ${darkMode ? 'dark-mode' : ''}`}>
@@ -848,10 +927,42 @@ function App() {
             <Link to="/" className="nav-logo">💰 Crypto Tax Tool</Link>
             <ul className="nav-menu">
               <li><Link to="/" className="nav-link">🏠 Home</Link></li>
-              <li><Link to="/transactions" className="nav-link">📋 Transactions</Link></li>
-              <li><Link to="/analytics" className="nav-link">📊 Analytics</Link></li>
-              <li><Link to="/tax-reports" className="nav-link">💳 Tax Reports</Link></li>
-              <li><button className="dark-mode-toggle" onClick={() => setDarkMode(!darkMode)}>{darkMode ? '☀️' : '🌙'}</button></li>
+              {user ? (
+                <>
+                  <li><Link to="/transactions" className="nav-link">📋 Transactions</Link></li>
+                  <li><Link to="/analytics" className="nav-link">📊 Analytics</Link></li>
+                  <li><Link to="/tax-reports" className="nav-link">💳 Tax Reports</Link></li>
+                  <li className="user-info">
+                    <span className="user-email">👤 {user.email}</span>
+                  </li>
+                  <li>
+                    <button 
+                      className="dark-mode-toggle" 
+                      onClick={() => setDarkMode(!darkMode)}
+                    >
+                      {darkMode ? '☀️' : '🌙'}
+                    </button>
+                  </li>
+                  <li>
+                    <button className="btn-logout" onClick={handleLogout}>
+                      🚪 Logout
+                    </button>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <button 
+                      className="dark-mode-toggle" 
+                      onClick={() => setDarkMode(!darkMode)}
+                    >
+                      {darkMode ? '☀️' : '🌙'}
+                    </button>
+                  </li>
+                  <li><Link to="/login" className="nav-link btn-nav">🔐 Login</Link></li>
+                  <li><Link to="/signup" className="nav-link btn-nav">📝 Sign Up</Link></li>
+                </>
+              )}
             </ul>
           </div>
         </nav>
@@ -859,10 +970,12 @@ function App() {
         <div className="container">
           {toast && <Toast message={toast.message} type={toast.type} />}
           <Routes>
-            <Route path="/" element={<Home transactions={transactions} totalInvested={totalInvested} totalQuantity={totalQuantity} historicalData={historicalData} coinData={coinData} darkMode={darkMode} prices={prices} taxInfo={taxInfo} />} />
-            <Route path="/transactions" element={<Transactions transactions={transactions} setTransactions={setTransactions} showForm={showForm} setShowForm={setShowForm} formData={formData} setFormData={setFormData} darkMode={darkMode} toast={toast} setToast={setToast} />} />
-            <Route path="/analytics" element={<Analytics transactions={transactions} totalInvested={totalInvested} coinData={coinData} prices={prices} taxInfo={taxInfo} />} />
-            <Route path="/tax-reports" element={<TaxReports transactions={transactions} totalInvested={totalInvested} coinData={coinData} prices={prices} darkMode={darkMode} taxInfo={taxInfo} />} />
+            <Route path="/" element={<Home transactions={transactions} totalInvested={totalInvested} totalQuantity={totalQuantity} historicalData={historicalData} coinData={coinData} darkMode={darkMode} prices={prices} taxInfo={taxInfo} user={user} />} />
+            <Route path="/transactions" element={<Transactions transactions={transactions} setTransactions={setTransactions} showForm={showForm} setShowForm={setShowForm} formData={formData} setFormData={setFormData} darkMode={darkMode} toast={toast} setToast={setToast} user={user} />} />
+            <Route path="/analytics" element={<Analytics transactions={transactions} totalInvested={totalInvested} coinData={coinData} prices={prices} taxInfo={taxInfo} user={user} />} />
+            <Route path="/tax-reports" element={<TaxReports transactions={transactions} totalInvested={totalInvested} coinData={coinData} prices={prices} darkMode={darkMode} taxInfo={taxInfo} user={user} />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/login" element={<Login />} />
           </Routes>
         </div>
 

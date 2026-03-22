@@ -590,6 +590,32 @@ body {
   opacity: 0.8;
 }
 
+.user-info {
+  margin-right: 10px;
+}
+
+.user-email {
+  color: white;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.btn-logout {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  background: #dc2626;
+  transform: translateY(-2px);
+}
+
 @media (max-width: 768px) {
   .nav-menu { gap: 1rem; }
   .page h1 { font-size: 1.8rem; }
